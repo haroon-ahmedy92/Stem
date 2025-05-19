@@ -69,6 +69,14 @@ public class RefreshTokenService {
 
     @Transactional
     public void deleteByToken(String token) {
-        refreshTokenRepository.findByToken(token).ifPresent(refreshTokenRepository::delete);
+        System.out.println("deleteByToken called with token: >>" + token + "<<"); // Add this line
+        Optional<RefreshToken> tokenToDelete = refreshTokenRepository.findByToken(token);
+        if (tokenToDelete.isPresent()) {
+            System.out.println("Token FOUND in DB for deletion."); // Add this line
+            refreshTokenRepository.delete(tokenToDelete.get());
+            System.out.println("Token deleted via repository."); // Add this line
+        } else {
+            System.out.println("Token NOT FOUND in DB for deletion."); // Add this line
+        }
     }
 }

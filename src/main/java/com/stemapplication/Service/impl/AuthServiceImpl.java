@@ -94,7 +94,7 @@ public class AuthServiceImpl implements AuthService {
             ResponseCookie jwtRefreshCookie = ResponseCookie.from(refreshTokenCookieName, refreshToken.getToken())
                     .httpOnly(true)
                     .secure(true) // Set to true in production (HTTPS)
-                    .path("/api/auth/refresh-token") // Accessible only by refresh token endpoint
+                    .path("/api/auth/") // Accessible only by refresh token endpoint
                     .maxAge(refreshToken.getExpiryDate().getEpochSecond() - Instant.now().getEpochSecond()) // duration in seconds
                     .sameSite("Strict") // Or "Lax" depending on your needs
                     .build();
@@ -291,6 +291,8 @@ public class AuthServiceImpl implements AuthService {
                     .findFirst()
                     .orElse(null);
         }
+
+        System.out.println("Logout attempting to delete token: >>" + providedRefreshToken + "<<"); // Add this line
 
         if (providedRefreshToken != null) {
             refreshTokenService.deleteByToken(providedRefreshToken);

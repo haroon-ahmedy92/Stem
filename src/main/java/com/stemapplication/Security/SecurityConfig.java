@@ -136,14 +136,29 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/users/me").authenticated() // Add GET /api/auth/users/me - requires authentication
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/users/me").authenticated() // PUT /me also requires authentication
+                        .requestMatchers(HttpMethod.POST, "/api/auth/users/me/change-password").authenticated()
                         .requestMatchers("/api/auth/refresh-token").permitAll()
+
+                        .requestMatchers("/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN")
+                        .requestMatchers("/api/admin/admins").hasAuthority("ROLE_SUPER_ADMIN")
+
+                        .requestMatchers("/api/blog/**").permitAll()
+                        .requestMatchers("/api/subscribe").permitAll()
+
                         // Define other public endpoints if any
                         .requestMatchers("/api/admin/approve-user/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers("/api/admin/promote-to-admin/**").hasAuthority("ROLE_SUPER_ADMIN")
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_SUPER_ADMIN") // General admin catch-all if needed
+
+                        .requestMatchers("/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN") // Existing GET /api/admin/users
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN") // Add PUT /api/admin/users/{userId}
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN") // Add DELETE /api/admin/users/{userId}
+
                         .anyRequest().authenticated() // All other requests need authentication
                 )
-                // .httpBasic(httpBasic -> httpBasic.realmName("Blog API")); // httpBasic might not be needed if only JWT
+
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         http.authenticationProvider(authenticationProvider());

@@ -49,13 +49,18 @@ public class AdminController {
     }
 
 
-    @PostMapping("/admin/promote-to-admin/{userId}")
+    @PostMapping("/promote-to-admin/{userId}")
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     public ResponseEntity<Map<String, String>> promoteToAdmin(@PathVariable Long userId) {
         return authService.promoteToAdmin(userId);
     }
 
 
+    @PostMapping("/demote-from-admin/{userId}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public ResponseEntity<Map<String, String>> demoteFromAdmin(@PathVariable Long userId) {
+        return authService.demoteFromAdmin(userId);
+    }
 
 
     @GetMapping("/admins")

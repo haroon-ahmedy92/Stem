@@ -447,6 +447,43 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+
+
+    @Override
+    @Transactional
+    public ResponseEntity<Map<String, String>> demoteFromAdmin(Long userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
+
+        Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN not found. Please create it."));
+
+        // Check if user has the admin role
+        if (user.getRoles().stream().anyMatch(role -> role.getName().equals("ROLE_ADMIN"))) {
+            // Remove the admin role
+            user.getRoles().removeIf(role -> role.getName().equals("ROLE_ADMIN"));
+
+            // Ensure the user still has at least ROLE_USER
+            Role userRole = roleRepository.findByName("ROLE_USER")
+                    .orElseThrow(() -> new IllegalStateException("ROLE_USER not found. Please create it."));
+
+            if (user.getRoles().stream().noneMatch(role -> role.getName().equals("ROLE_USER"))) {
+                user.getRoles().add(userRole);
+            }
+
+            userRepository.save(user);
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "User " + user.getUsername() + " has been demoted from Admin role.");
+            return new ResponseEntity<>(successResponse, HttpStatus.OK);
+        } else {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "User " + user.getUsername() + " is not an Admin.");
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
     @Override
     public UserProfileDto getUserProfile(String username) {
         // Find the user by username

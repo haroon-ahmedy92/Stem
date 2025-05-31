@@ -16,6 +16,7 @@ public interface AuthService {
     ResponseEntity<Map<String,String>> approveUser(Long userId);
     ResponseEntity<Map<String, String>> suspendUser(Long userId);
     ResponseEntity<Map<String, String>> promoteToAdmin(Long userId);
+    ResponseEntity<Map<String, String>> demoteFromAdmin(Long userId);
     UserProfileDto getUserProfile(String username);
     MyProfileDto updateMyProfile(String username, UpdateMyProfileDto updateDetails);
     void changePassword(String username, ChangePasswordDto changePasswordDto);

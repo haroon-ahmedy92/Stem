@@ -392,6 +392,32 @@ public class AuthServiceImpl implements AuthService {
         return new ResponseEntity<>(successResponse, HttpStatus.OK);
     }
 
+
+    @Override
+    @Transactional
+    public ResponseEntity<Map<String, String>> suspendUser(Long userId) {
+        try {
+            UserEntity user = userRepository.findById(userId)
+                    .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("User not found with ID: " + userId));
+
+            // Set user's approval status to false
+            user.setApproved(false);
+            userRepository.save(user);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "User has been suspended successfully");
+            return ResponseEntity.ok(response);
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "An error occurred while suspending the user: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
     @Override
     @Transactional
     public ResponseEntity<Map<String, String>> promoteToAdmin(Long userId) {

@@ -41,6 +41,14 @@ public class AdminController {
     }
 
 
+
+    @PostMapping("/suspend-user")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    public ResponseEntity<Map<String, String>> suspendUser(@RequestBody ApproveUserDto suspendUserDto) {
+        return authService.suspendUser(suspendUserDto.getUserId());
+    }
+
+
     @PostMapping("/admin/promote-to-admin/{userId}")
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     public ResponseEntity<Map<String, String>> promoteToAdmin(@PathVariable Long userId) {

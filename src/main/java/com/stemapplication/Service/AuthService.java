@@ -14,6 +14,7 @@ public interface AuthService {
     ResponseEntity<?> refreshToken(HttpServletRequest request, HttpServletResponse response);
     ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response);
     ResponseEntity<Map<String,String>> approveUser(Long userId);
+    ResponseEntity<Map<String, String>> suspendUser(Long userId);
     ResponseEntity<Map<String, String>> promoteToAdmin(Long userId);
     UserProfileDto getUserProfile(String username);
     MyProfileDto updateMyProfile(String username, UpdateMyProfileDto updateDetails);

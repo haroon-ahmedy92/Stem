@@ -53,6 +53,7 @@ public class SecurityConfig {
                         // --- Admin & Super Admin Endpoints (Control Panel) ---
                         // Specific endpoints for admin panel actions
                         .requestMatchers("/api/admin/approve-user").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers("/api/admin/suspend-user").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers("/api/admin/promote-to-admin/**").hasAuthority("ROLE_SUPER_ADMIN")
                         // General user/admin management by Super Admin
                         .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN")

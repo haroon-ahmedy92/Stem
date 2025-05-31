@@ -1,5 +1,6 @@
 package com.stemapplication.Controller;
-import com.stemapplication.Models.BlogPost;
+
+import com.stemapplication.DTO.BlogPostDto;
 import com.stemapplication.Service.PostService;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -29,9 +30,11 @@ public class DocumentController {
 
     @GetMapping("/{postId}")
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long postId) {
-        Optional<BlogPost> postOptional = Optional.ofNullable(postService.getPostById(postId));
+        // CHANGE 1: Call getPostByIdDto and it returns BlogPostDto
+        Optional<BlogPostDto> postOptional = Optional.ofNullable(postService.getPostByIdDto(postId));
         if (postOptional.isPresent()) {
-            BlogPost blogPost = postOptional.get();
+            // CHANGE 2: The type is now BlogPostDto
+            BlogPostDto blogPost = postOptional.get();
             String documentUrl = blogPost.getDocumentUrl();
             if (documentUrl != null && !documentUrl.isEmpty()) {
                 try {
@@ -46,15 +49,22 @@ public class DocumentController {
                                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                                 .body(resource);
                     } else {
+                        // Resource not found or not readable at the given URL path
                         return new ResponseEntity<>(HttpStatus.NOT_FOUND);
                     }
                 } catch (MalformedURLException e) {
+                    // Invalid URL format
+                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+                } catch (Exception e) {
+                    // Catch any other potential file system or IO errors
                     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
                 }
             } else {
+                // Document URL is null or empty in the blog post
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
             }
         } else {
+            // Blog post not found
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }

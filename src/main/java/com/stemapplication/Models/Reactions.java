@@ -1,37 +1,17 @@
 package com.stemapplication.Models;
 
 import jakarta.persistence.Embeddable;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Embeddable
 public class Reactions {
-    private int likes;
-    private int comments;
-
-    // Constructors
-    public Reactions() {
-    }
-
-    public Reactions(int likes, int comments) {
-        this.likes = likes;
-        this.comments = comments;
-    }
-
-    // Getters and Setters
-    public int getLikes() {
-        return likes;
-    }
-
-    public void setLikes(int likes) {
-        this.likes = likes;
-    }
-
-    public int getComments() {
-        return comments;
-    }
-
-    public void setComments(int comments) {
-        this.comments = comments;
-    }
+    private int likes = 0;
+    private int comments = 0;
 
     // equals and hashCode
     @Override

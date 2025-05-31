@@ -1,100 +1,3 @@
-//package com.stemapplication.Security;
-//import org.springframework.context.annotation.Bean;
-//import org.springframework.context.annotation.Configuration;
-//import org.springframework.security.authentication.AuthenticationManager;
-//import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-//import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-//import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-//import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-//import org.springframework.security.config.http.SessionCreationPolicy;
-//import org.springframework.security.core.userdetails.User;
-//import org.springframework.security.core.userdetails.UserDetails;
-//import org.springframework.security.core.userdetails.UserDetailsService;
-//import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-//import org.springframework.security.crypto.password.PasswordEncoder;
-//import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-//import org.springframework.security.web.AuthenticationEntryPoint;
-//import org.springframework.security.web.SecurityFilterChain;
-//import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-//
-//@Configuration
-//@EnableWebSecurity
-//public class SecurityConfig {
-//
-//    AuthenticationEntryPoint authenticationEntryPoint;
-//
-//    public SecurityConfig(AuthenticationEntryPoint authenticationEntryPoint) {
-//        this.authenticationEntryPoint = authenticationEntryPoint;
-//    }
-//
-//    @Bean
-//    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-//        http
-//                .csrf(csrf -> csrf.disable())
-//                .exceptionHandling()
-//                .authenticationEntryPoint(authenticationEntryPoint)
-//                .and()
-//                .sessionManagement()
-//                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-//                .and()
-//                .authorizeHttpRequests(auth -> auth
-//                        .requestMatchers("/api/admin/register").permitAll()
-//                        .requestMatchers("/api/subscribe").permitAll()
-//                        .requestMatchers("/api/admin/subscriptions").permitAll()
-//                        .requestMatchers("/api/admin/**").authenticated()
-//                        .requestMatchers("/api/posts/**").permitAll()
-//                        .anyRequest().authenticated()
-//                )
-//                .httpBasic(httpBasic -> httpBasic.realmName("Blog API"))
-//        .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
-//
-//        http.authenticationProvider(authenticationProvider());
-//
-//        return http.build();
-//    }
-//
-//    @Bean
-//    public PasswordEncoder passwordEncoder() {
-//        return new BCryptPasswordEncoder();
-//    }
-//
-//    @Bean
-//    public DaoAuthenticationProvider authenticationProvider() {
-//        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-//        authProvider.setUserDetailsService(userDetailsService()); // Changed to use the inMemoryUserDetailsService
-//        authProvider.setPasswordEncoder(passwordEncoder());
-//        return authProvider;
-//    }
-//    @Bean
-//    public UserDetailsService userDetailsService() { // Added InMemoryUserDetailsManager
-//        UserDetails admin = User.withUsername("admin")
-//                .password(passwordEncoder().encode("admin@123"))
-//                .roles("ADMIN")
-//                .build();
-//
-//        UserDetails user = User.withUsername("staff")
-//                .password(passwordEncoder().encode("staff@123"))
-//                .roles("STAFF")
-//                .build();
-//
-//        return new InMemoryUserDetailsManager(admin, user);
-//    }
-//
-//    @Bean
-//    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-//        return authConfig.getAuthenticationManager();
-//    }
-//
-//    @Bean
-//    public JWTAuthenticationFilter jwtAuthenticationFilter(){
-//        return new JWTAuthenticationFilter();
-//    }
-//
-//}
-//
-//
-
-
 package com.stemapplication.Security;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -134,29 +37,57 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(authEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // --- Public Auth Endpoints ---
                         .requestMatchers("/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/users/me").authenticated() // Add GET /api/auth/users/me - requires authentication
-                        .requestMatchers(HttpMethod.PUT, "/api/auth/users/me").authenticated() // PUT /me also requires authentication
-                        .requestMatchers(HttpMethod.POST, "/api/auth/users/me/change-password").authenticated()
                         .requestMatchers("/api/auth/refresh-token").permitAll()
-
-                        .requestMatchers("/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN")
-                        .requestMatchers("/api/admin/admins").hasAuthority("ROLE_SUPER_ADMIN")
-
-                        .requestMatchers("/api/blog/**").permitAll()
                         .requestMatchers("/api/subscribe").permitAll()
 
-                        // Define other public endpoints if any
-                        .requestMatchers("/api/admin/approve-user/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        // --- Authenticated User Profile Endpoints ---
+                        .requestMatchers(HttpMethod.GET, "/api/auth/users/me").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/users/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/users/me/change-password").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
+
+
+                        // --- Admin & Super Admin Endpoints (Control Panel) ---
+                        // Specific endpoints for admin panel actions
+                        .requestMatchers("/api/admin/approve-user").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers("/api/admin/promote-to-admin/**").hasAuthority("ROLE_SUPER_ADMIN")
-                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_SUPER_ADMIN") // General admin catch-all if needed
+                        // General user/admin management by Super Admin
+                        .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/admin/admins").hasAuthority("ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN")
 
-                        .requestMatchers("/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN") // Existing GET /api/admin/users
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN") // Add PUT /api/admin/users/{userId}
-                        .requestMatchers(HttpMethod.DELETE, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN") // Add DELETE /api/admin/users/{userId}
 
-                        .anyRequest().authenticated() // All other requests need authentication
+                        // --- Blog Public Endpoints (accessible to anyone) ---
+                        .requestMatchers(HttpMethod.GET, "/api/blog").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog/posts").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog/posts/{id}").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog/posts/category/{categoryId}").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog/categories").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog/featured").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog/popular").permitAll() // from PublicPostController
+
+                        // --- Blog Authenticated Endpoints (for authors and admins) ---
+                        // Note: The base path for these is now /api/blog/posts in AuthenticatedPostController
+                        .requestMatchers(HttpMethod.POST, "/api/blog/posts").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN") // createPost
+                        .requestMatchers(HttpMethod.PUT, "/api/blog/posts/{id}").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN") // updatePost
+                        .requestMatchers(HttpMethod.DELETE, "/api/blog/posts/{id}").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN") // deletePost
+
+                        // --- Comments Public Endpoints ---
+                        .requestMatchers(HttpMethod.GET, "/api/comments/post/{blogPostId}").permitAll() // Get approved comments for a post
+                        .requestMatchers(HttpMethod.POST, "/api/comments/post/{blogPostId}").permitAll() // Allow guests and authenticated to post comments
+
+                        // --- Comments Admin/Moderator Endpoints ---
+                        .requestMatchers(HttpMethod.GET, "/api/admin/comments/pending").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Changed path
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/comments/approve/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Changed path
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/comments/delete/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Changed path
+                        .requestMatchers(HttpMethod.GET, "/api/admin/comments/post/{blogPostId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Already correct
+
+
+                        .anyRequest().authenticated()
                 )
 
                 .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);

@@ -34,15 +34,11 @@ public class AdminController {
 
 
 
-
-
     @PostMapping("/approve-user")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<Map<String, String>> approveUser(@RequestBody ApproveUserDto approveUserDto) {
         return authService.approveUser(approveUserDto.getUserId());
     }
-
-
 
 
     @PostMapping("/admin/promote-to-admin/{userId}")
@@ -69,8 +65,6 @@ public class AdminController {
     public ResponseEntity<List<com.stemapplication.DTO.UserProfileDto>> getAllUsers() {
         return ResponseEntity.ok(adminService.getAllUsers());
     }
-
-
 
 
 

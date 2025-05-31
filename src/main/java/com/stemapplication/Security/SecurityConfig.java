@@ -22,7 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthEntryPoint authEntryPoint;
-    private final CustomUserDetailsService customUserDetailsService; // Autowire your custom service
+    private final CustomUserDetailsService customUserDetailsService;
 
     @Autowired
     public SecurityConfig(JwtAuthEntryPoint authEntryPoint, CustomUserDetailsService customUserDetailsService) {
@@ -49,7 +49,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/users/me/change-password").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
 
-
                         // --- Admin & Super Admin Endpoints (Control Panel) ---
                         // Specific endpoints for admin panel actions
                         .requestMatchers("/api/admin/approve-user").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
@@ -62,32 +61,43 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN")
 
-
                         // --- Blog Public Endpoints (accessible to anyone) ---
-                        .requestMatchers(HttpMethod.GET, "/api/blog").permitAll() // from PublicPostController
-                        .requestMatchers(HttpMethod.GET, "/api/blog/posts").permitAll() // from PublicPostController
-                        .requestMatchers(HttpMethod.GET, "/api/blog/posts/{id}").permitAll() // from PublicPostController
-                        .requestMatchers(HttpMethod.GET, "/api/blog/posts/category/{categoryId}").permitAll() // from PublicPostController
-                        .requestMatchers(HttpMethod.GET, "/api/blog/categories").permitAll() // from PublicPostController
-                        .requestMatchers(HttpMethod.GET, "/api/blog/featured").permitAll() // from PublicPostController
-                        .requestMatchers(HttpMethod.GET, "/api/blog/popular").permitAll() // from PublicPostController
+                        .requestMatchers(HttpMethod.GET, "/api/blog").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blog/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blog/posts/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blog/posts/category/{categoryId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blog/categories").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blog/featured").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blog/popular").permitAll()
 
                         // --- Blog Authenticated Endpoints (for authors and admins) ---
-                        // Note: The base path for these is now /api/blog/posts in AuthenticatedPostController
-                        .requestMatchers(HttpMethod.POST, "/api/blog/posts").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN") // createPost
-                        .requestMatchers(HttpMethod.PUT, "/api/blog/posts/{id}").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN") // updatePost
-                        .requestMatchers(HttpMethod.DELETE, "/api/blog/posts/{id}").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN") // deletePost
+                        .requestMatchers(HttpMethod.POST, "/api/blog/posts").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/blog/posts/{id}").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/blog/posts/{id}").hasAnyAuthority("ROLE_USER", "ROLE_ADMIN", "ROLE_SUPER_ADMIN")
 
                         // --- Comments Public Endpoints ---
-                        .requestMatchers(HttpMethod.GET, "/api/comments/post/{blogPostId}").permitAll() // Get approved comments for a post
-                        .requestMatchers(HttpMethod.POST, "/api/comments/post/{blogPostId}").permitAll() // Allow guests and authenticated to post comments
+                        .requestMatchers(HttpMethod.GET, "/api/comments/post/{blogPostId}").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/comments/post/{blogPostId}").permitAll()
 
                         // --- Comments Admin/Moderator Endpoints ---
-                        .requestMatchers(HttpMethod.GET, "/api/admin/comments/pending").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Changed path
-                        .requestMatchers(HttpMethod.PUT, "/api/admin/comments/approve/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Changed path
-                        .requestMatchers(HttpMethod.DELETE, "/api/admin/comments/delete/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Changed path
-                        .requestMatchers(HttpMethod.GET, "/api/admin/comments/post/{blogPostId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN") // Already correct
-
+                        .requestMatchers(HttpMethod.GET, "/api/admin/comments/pending").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/comments/approve/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/comments/delete/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/admin/comments/post/{blogPostId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        
+                        // --- Gallery Public Endpoints ---
+                        .requestMatchers(HttpMethod.GET, "/api/gallery").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/gallery/{id}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/gallery/category/{categoryId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/gallery/user/{userId}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/gallery/tag/{tag}").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/gallery/featured").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/gallery/{id}/view").permitAll()
+                        
+                        // --- Gallery Authenticated Endpoints ---
+                        .requestMatchers(HttpMethod.POST, "/api/gallery").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/gallery/{id}").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/gallery/{id}").authenticated()
 
                         .anyRequest().authenticated()
                 )
@@ -107,7 +117,7 @@ public class SecurityConfig {
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(customUserDetailsService); // Use your custom user details service
+        authProvider.setUserDetailsService(customUserDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -119,6 +129,6 @@ public class SecurityConfig {
 
     @Bean
     public JWTAuthenticationFilter jwtAuthenticationFilter() {
-        return new JWTAuthenticationFilter(); // This filter should be a @Component or defined as a bean
+        return new JWTAuthenticationFilter();
     }
 }

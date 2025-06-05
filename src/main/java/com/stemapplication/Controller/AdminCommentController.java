@@ -70,9 +70,13 @@ public class AdminCommentController {
      */
     @DeleteMapping("/delete/{commentId}")
     @PreAuthorize("hasAnyAuthority('ROLE_USER','ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
-    public ResponseEntity<?> deleteComment(@PathVariable Long commentId) {
+    public ResponseEntity<?> deleteComment(@PathVariable Long commentId, Principal principal) {
         try {
-            return commentService.deleteComment(commentId);
+            // Extract the username of the authenticated user performing the deletion
+            String deleterUsername = principal.getName();
+
+            // Pass this username to the service method
+            return commentService.deleteComment(commentId, deleterUsername);
         } catch (EntityNotFoundException e) {
             return new ResponseEntity<>(Map.of("message", e.getMessage()), HttpStatus.NOT_FOUND);
         } catch (Exception e) {

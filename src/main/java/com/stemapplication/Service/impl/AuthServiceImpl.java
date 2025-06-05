@@ -1,7 +1,5 @@
 package com.stemapplication.Service.impl;
 
-
-
 import com.stemapplication.DTO.*;
 import com.stemapplication.Models.RefreshToken;
 import com.stemapplication.Models.Role;
@@ -9,8 +7,10 @@ import com.stemapplication.Models.UserEntity;
 import com.stemapplication.Repository.RoleRepository;
 import com.stemapplication.Repository.UserRepository;
 import com.stemapplication.Security.JWTGenerator;
+import com.stemapplication.Service.ActivityLogService;
 import com.stemapplication.Service.AuthService;
 import com.stemapplication.Service.RefreshTokenService;
+import com.stemapplication.Utils.ActivityLogger;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.Cookie;
@@ -31,7 +31,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
+import java.security.Principal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -39,7 +39,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-
+/**
+ * Implementation of the AuthService interface with activity logging integration.
+ * This service handles user authentication, registration, profile management,
+ * token operations, and account management.
+ */
 @Service
 public class AuthServiceImpl implements AuthService {
 
@@ -49,27 +53,32 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final JWTGenerator jwtGenerator;
     private final RefreshTokenService refreshTokenService;
+    private final ActivityLogService activityLogService;
+    private final ActivityLogger activityLogger;
 
     @Value("${app.jwt.refresh-cookie-name}")
     private String refreshTokenCookieName;
 
-
     public AuthServiceImpl(UserRepository userRepository,
-                           RoleRepository roleRepository,
-                           PasswordEncoder passwordEncoder,
-                           AuthenticationManager authenticationManager,
-                           JWTGenerator jwtGenerator,
-                           RefreshTokenService refreshTokenService) {
+                                   RoleRepository roleRepository,
+                                   PasswordEncoder passwordEncoder,
+                                   AuthenticationManager authenticationManager,
+                                   JWTGenerator jwtGenerator,
+                                   RefreshTokenService refreshTokenService,
+                                   ActivityLogService activityLogService,
+                                   ActivityLogger activityLogger) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtGenerator = jwtGenerator;
         this.refreshTokenService = refreshTokenService;
+        this.activityLogService = activityLogService;
+        this.activityLogger = activityLogger;
     }
 
     @Override
-  //@Transactional
+    //@Transactional
     public ResponseEntity<?> login(LoginDto loginDto, HttpServletResponse response) {
         Authentication authentication;
         try {
@@ -77,21 +86,18 @@ public class AuthServiceImpl implements AuthService {
                     new UsernamePasswordAuthenticationToken(loginDto.getUsername(), loginDto.getPassword())
             );
             // Authentication was successful, proceed to generate tokens, cookies, etc.
-
-            System.out.println("Authentication successful for user: " + loginDto.getUsername()); // Added logging
+            System.out.println("Authentication successful for user: " + loginDto.getUsername());
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String token = jwtGenerator.generateToken(authentication);
-            System.out.println("Generated Token: " + token); // Added logging
 
             UserEntity userEntity = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found after authentication: " + authentication.getName())); // Modified message slightly
-            System.out.println("User entity found for ID: " + userEntity.getId()); // Added logging
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found after authentication: " + authentication.getName()));
 
+            // Log successful login
+            activityLogger.logLogin(userEntity.getUsername(), userEntity.getId());
 
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(userEntity.getId());
-            System.out.println("Refresh Token created/retrieved: " + refreshToken.getToken()); // Added logging
-
 
             ResponseCookie jwtRefreshCookie = ResponseCookie.from(refreshTokenCookieName, refreshToken.getToken())
                     .httpOnly(true)
@@ -101,49 +107,125 @@ public class AuthServiceImpl implements AuthService {
                     .sameSite("Strict") // Or "Lax" depending on your needs
                     .build();
             response.addHeader(HttpHeaders.SET_COOKIE, jwtRefreshCookie.toString());
-            System.out.println("Refresh Cookie added to response"); // Added logging
 
-
-            return ResponseEntity.ok(new AuthResponseDto(token)); // Already returning a DTO (JSON)
+            return ResponseEntity.ok(new AuthResponseDto(token));
 
         } catch (BadCredentialsException e) {
-            System.out.println("Login failed: Invalid credentials for user: " + loginDto.getUsername()); // Added logging
+            // Log failed login attempt
+            activityLogger.logFailedLogin(loginDto.getUsername(), "Invalid credentials");
+
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password!");
             return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
 
         } catch (DisabledException e) {
-            // This should now primarily be caught if your CustomUserDetailsService directly throws DisabledException
-            System.out.println("Login failed: Disabled account for user: " + loginDto.getUsername()); // Added logging
+            // Log disabled account attempt
+            activityLogger.logFailedLogin(loginDto.getUsername(), "Account disabled or not approved");
+
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "User account is not approved yet or disabled.");
-            return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN); // Use 403 Forbidden
+            return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
 
-        } catch (InternalAuthenticationServiceException e) { // <-- Catch the wrapper exception
-            // Check if the cause is the DisabledException
+        } catch (InternalAuthenticationServiceException e) {
             if (e.getCause() instanceof DisabledException) {
-                System.out.println("Login failed: Internal service exception (Disabled account) for user: " + loginDto.getUsername()); // Added logging
+                // Log disabled account attempt
+                activityLogger.logFailedLogin(loginDto.getUsername(), "Account disabled or not approved");
+
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "User account is not approved yet or disabled.");
-                return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN); // Return 403 Forbidden
-
+                return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
             } else {
-                // If it's another type of InternalAuthenticationServiceException, re-throw or handle as internal error
-                System.err.println("Login failed: Unexpected InternalAuthenticationServiceException for user: " + loginDto.getUsername()); // Added logging
-                e.printStackTrace(); // Print stack trace for debugging
+                // Log system error
+                activityLogger.logSystemError("Authentication service error for user: " + loginDto.getUsername());
+
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "An internal authentication service error occurred.");
-                return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR); // Return 500
+                return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
             }
+        } catch (Exception e) {
+            // Log unexpected error
+            activityLogger.logSystemError("Unexpected error during login for user: " + loginDto.getUsername());
 
-        } catch (Exception e) { // <-- Catch any other unexpected exceptions during the process *after* authenticate()
-            System.err.println("Login failed: An unexpected error occurred after authentication for user: " + loginDto.getUsername()); // Added logging
-            e.printStackTrace(); // Print stack trace for debugging
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "An unexpected error occurred during login.");
-            return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR); // Return 500
+            return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+
+//    @Override
+//    @Transactional  // ✅ ADD @Transactional for consistency
+//    public ResponseEntity<?> login(LoginDto loginDto, HttpServletResponse response) {
+//        Authentication authentication;
+//        try {
+//            authentication = authenticationManager.authenticate(
+//                    new UsernamePasswordAuthenticationToken(loginDto.getUsername(), loginDto.getPassword())
+//            );
+//            // Authentication was successful, proceed to generate tokens, cookies, etc.
+//            System.out.println("Authentication successful for user: " + loginDto.getUsername());
+//
+//            SecurityContextHolder.getContext().setAuthentication(authentication);
+//            String token = jwtGenerator.generateToken(authentication);
+//
+//            UserEntity userEntity = userRepository.findByUsername(authentication.getName())
+//                    .orElseThrow(() -> new UsernameNotFoundException("User not found after authentication: " + authentication.getName()));
+//
+//            // Log successful login
+//            activityLogger.logLogin(userEntity.getUsername(), userEntity.getId());
+//
+//            // ✅ Clear any existing refresh tokens for this user before creating new one
+//            refreshTokenService.deleteByUserId(userEntity.getId());
+//
+//            RefreshToken refreshToken = refreshTokenService.createRefreshToken(userEntity.getId());
+//
+//            // ✅ USE CONSISTENT COOKIE SETTINGS WITH HELPER METHOD
+//            setRefreshTokenCookie(response, refreshToken);
+//
+//            return ResponseEntity.ok(new AuthResponseDto(token));
+//
+//        } catch (BadCredentialsException e) {
+//            // Log failed login attempt
+//            activityLogger.logFailedLogin(loginDto.getUsername(), "Invalid credentials");
+//
+//            Map<String, String> errorResponse = new HashMap<>();
+//            errorResponse.put("message", "Invalid username or password!");
+//            return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+//
+//        } catch (DisabledException e) {
+//            // Log disabled account attempt
+//            activityLogger.logFailedLogin(loginDto.getUsername(), "Account disabled or not approved");
+//
+//            Map<String, String> errorResponse = new HashMap<>();
+//            errorResponse.put("message", "User account is not approved yet or disabled.");
+//            return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+//
+//        } catch (InternalAuthenticationServiceException e) {
+//            if (e.getCause() instanceof DisabledException) {
+//                // Log disabled account attempt
+//                activityLogger.logFailedLogin(loginDto.getUsername(), "Account disabled or not approved");
+//
+//                Map<String, String> errorResponse = new HashMap<>();
+//                errorResponse.put("message", "User account is not approved yet or disabled.");
+//                return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+//            } else {
+//                // Log system error
+//                activityLogger.logSystemError("Authentication service error for user: " + loginDto.getUsername());
+//
+//                Map<String, String> errorResponse = new HashMap<>();
+//                errorResponse.put("message", "An internal authentication service error occurred.");
+//                return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+//            }
+//        } catch (Exception e) {
+//            // Log unexpected error
+//            activityLogger.logSystemError("Unexpected error during login for user: " + loginDto.getUsername());
+//
+//            Map<String, String> errorResponse = new HashMap<>();
+//            errorResponse.put("message", "An unexpected error occurred during login.");
+//            return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
+//    }
+
+
 
     @Override
     @Transactional
@@ -151,8 +233,7 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByUsername(registerDto.getUsername())) {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Username is already taken!");
-            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST
-            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
         }
         if (userRepository.existsByEmail(registerDto.getEmail())) {
             Map<String, String> errorResponse = new HashMap<>();
@@ -178,13 +259,21 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
 
+        // Log user registration
+        activityLogger.logRegistration(user.getUsername());
+
         Map<String, String> successResponse = new HashMap<>();
         successResponse.put("message", "User registered successfully! Awaiting approval.");
         return new ResponseEntity<>(successResponse, HttpStatus.OK);
     }
 
+
+
+
+
+
+
     @Override
-// @Transactional // Refresh token process might involve DB ops (delete/create token)
     public ResponseEntity<?> refreshToken(HttpServletRequest request, HttpServletResponse response) {
         String providedRefreshToken = null;
         if (request.getCookies() != null) {
@@ -196,7 +285,6 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (providedRefreshToken == null) {
-            System.out.println("Refresh token not found in cookie."); // Add logging
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Refresh token not found in cookie.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
@@ -207,8 +295,6 @@ public class AuthServiceImpl implements AuthService {
             Optional<RefreshToken> refreshTokenOptional = refreshTokenService.findByToken(providedRefreshToken);
 
             if (!refreshTokenOptional.isPresent()) {
-                System.out.println("Invalid refresh token: Token not found in DB for token: " + providedRefreshToken); // Add logging
-                // Optionally delete a potentially malformed cookie if it exists but token isn't in DB
                 ResponseCookie expiredCookie = ResponseCookie.from(refreshTokenCookieName, "")
                         .maxAge(0)
                         .path("/api/auth/refresh-token")
@@ -216,6 +302,10 @@ public class AuthServiceImpl implements AuthService {
                         .secure(false)
                         .sameSite("Strict").build();
                 response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+                // Log invalid token attempt
+                activityLogger.logSystemActivity("Invalid refresh token attempt");
+
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "Invalid refresh token.");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
@@ -223,15 +313,12 @@ public class AuthServiceImpl implements AuthService {
 
             RefreshToken refreshToken = refreshTokenOptional.get();
 
-            // Verify token expiration (this method throws RuntimeException if expired)
-            refreshTokenService.verifyExpiration(refreshToken); // This updates the token entity potentially, or just validates
-
+            // Verify token expiration
+            refreshTokenService.verifyExpiration(refreshToken);
 
             // Get the user associated with the refresh token
             UserEntity userEntity = refreshToken.getUser();
             if (userEntity == null) {
-                System.err.println("Refresh token found but user association is null for token: " + providedRefreshToken); // Add logging
-                // Invalid state, delete the refresh token
                 refreshTokenService.deleteByToken(providedRefreshToken);
                 ResponseCookie expiredCookie = ResponseCookie.from(refreshTokenCookieName, "")
                         .maxAge(0)
@@ -240,15 +327,17 @@ public class AuthServiceImpl implements AuthService {
                         .secure(false)
                         .sameSite("Strict").build();
                 response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+                // Log invalid token attempt
+                activityLogger.logSystemActivity("Invalid token: User not associated");
+
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "Invalid token: User not associated.");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
             }
 
             // Check if the user account is approved/enabled
-            if (!userEntity.isApproved()) { // Assuming isApproved() is the check you need
-                System.out.println("Refresh token valid but user account not approved: " + userEntity.getUsername()); // Add logging
-                // Optionally delete refresh token for disabled user
+            if (!userEntity.isApproved()) {
                 refreshTokenService.deleteByToken(providedRefreshToken);
                 ResponseCookie expiredCookie = ResponseCookie.from(refreshTokenCookieName, "")
                         .maxAge(0)
@@ -258,27 +347,26 @@ public class AuthServiceImpl implements AuthService {
                         .sameSite("Strict")
                         .build();
                 response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+                // Log disabled account attempt
+                activityLogger.logSystemActivity("Refresh token attempt on disabled account: " + userEntity.getUsername());
+
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "User account is not approved yet or disabled.");
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
             }
 
-
             // If token is valid and user is active, create a new access token
-            // Create an Authentication object based on the user from the refresh token
             Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    userEntity.getUsername(), // principal (username)
-                    null, // credentials (not needed for token-based auth after initial login)
-                    userEntity.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList()) // user authorities/roles
+                    userEntity.getUsername(),
+                    null,
+                    userEntity.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList())
             );
-            SecurityContextHolder.getContext().setAuthentication(authentication); // Set authentication context
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // Generate a new JWT access token
             String newAccessToken = jwtGenerator.generateToken(authentication);
-            System.out.println("New Access Token generated via refresh for user: " + userEntity.getUsername()); // Add logging
 
-
-            // *** Refresh Token Rotation (Optional but Recommended) ***
             // Delete the old refresh token before creating a new one
             refreshTokenService.deleteByToken(providedRefreshToken);
             // Create and save a new refresh token
@@ -287,32 +375,32 @@ public class AuthServiceImpl implements AuthService {
             // Set the new refresh token in an HttpOnly cookie
             ResponseCookie jwtRefreshCookie = ResponseCookie.from(refreshTokenCookieName, newRefreshToken.getToken())
                     .httpOnly(true)
-                    .secure(false) // Use true in production with HTTPS
-                    .path("/api/auth/refresh-token") // Set path appropriately
+                    .secure(false)
+                    .path("/api/auth/refresh-token")
                     .maxAge(newRefreshToken.getExpiryDate().getEpochSecond() - Instant.now().getEpochSecond())
-                    .sameSite("Strict") // Choose Strict or Lax based on needs
+                    .sameSite("Strict")
                     .build();
             response.addHeader(HttpHeaders.SET_COOKIE, jwtRefreshCookie.toString());
-            System.out.println("New Refresh Cookie set for user: " + userEntity.getUsername()); // Add logging
 
+            // Log successful token refresh
+            activityLogger.logSystemActivity("Token refreshed for user: " + userEntity.getUsername());
 
             // Return the new access token in the body
-            return ResponseEntity.ok(new AuthResponseDto(newAccessToken)); // Already returning a DTO (JSON)
+            return ResponseEntity.ok(new AuthResponseDto(newAccessToken));
 
-        } catch (ExpiredJwtException e) { // Catch JJWT specific expired exception if verifyExpiration throws it
-            System.out.println("Refresh token expired for token: " + providedRefreshToken); // Add logging
-            // Clean up expired token from DB if verifyExpiration didn't already
-            refreshTokenService.deleteByToken(providedRefreshToken); // Ensure it's deleted
+        } catch (ExpiredJwtException e) {
+            refreshTokenService.deleteByToken(providedRefreshToken);
             ResponseCookie expiredCookie = ResponseCookie.from(refreshTokenCookieName, "").maxAge(0).path("/api/auth/refresh-token").httpOnly(true).secure(false).sameSite("Strict").build();
             response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+            // Log expired token
+            activityLogger.logSystemActivity("Refresh token expired");
+
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Refresh token expired. Please log in again.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
 
-        } catch (RuntimeException e) { // Catch RuntimeExceptions from verifyExpiration (if it throws generic) or other issues
-            System.err.println("Runtime error during refresh token process for token: " + providedRefreshToken + " - " + e.getMessage()); // Add logging
-            e.printStackTrace(); // Print stack trace
-            // Decide how to handle - often treated as invalid token or internal error
+        } catch (RuntimeException e) {
             ResponseCookie expiredCookie = ResponseCookie.from(refreshTokenCookieName, "")
                     .maxAge(0)
                     .path("/api/auth/refresh-token")
@@ -321,12 +409,14 @@ public class AuthServiceImpl implements AuthService {
                     .sameSite("Strict")
                     .build();
             response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+            // Log error
+            activityLogger.logSystemError("Runtime error during refresh token process: " + e.getMessage());
+
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Invalid refresh token."); // Or INTERNAL_SERVER_ERROR depending on expected cause
+            errorResponse.put("message", "Invalid refresh token.");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-        } catch (Exception e) { // Catch any other unexpected exceptions
-            System.err.println("An unexpected error occurred during refresh token process for token: " + providedRefreshToken); // Add logging
-            e.printStackTrace();
+        } catch (Exception e) {
             ResponseCookie expiredCookie = ResponseCookie
                     .from(refreshTokenCookieName, "")
                     .maxAge(0)
@@ -336,6 +426,10 @@ public class AuthServiceImpl implements AuthService {
                     .sameSite("Strict")
                     .build();
             response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+
+            // Log unexpected error
+            activityLogger.logSystemError("Unexpected error during token refresh: " + e.getMessage());
+
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "An unexpected error occurred during token refresh.");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
@@ -343,9 +437,128 @@ public class AuthServiceImpl implements AuthService {
     }
 
 
+
+//    @Override
+//    @Transactional  // ✅ ADD THIS!
+//    public ResponseEntity<?> refreshToken(HttpServletRequest request, HttpServletResponse response) {
+//        String providedRefreshToken = null;
+//        if (request.getCookies() != null) {
+//            providedRefreshToken = Stream.of(request.getCookies())
+//                    .filter(cookie -> refreshTokenCookieName.equals(cookie.getName()))
+//                    .map(Cookie::getValue)
+//                    .findFirst()
+//                    .orElse(null);
+//        }
+//
+//        if (providedRefreshToken == null) {
+//            Map<String, String> errorResponse = new HashMap<>();
+//            errorResponse.put("message", "Refresh token not found in cookie.");
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+//        }
+//
+//        try {
+//            // Find the token in the database
+//            Optional<RefreshToken> refreshTokenOptional = refreshTokenService.findByToken(providedRefreshToken);
+//
+//            if (!refreshTokenOptional.isPresent()) {
+//                clearRefreshTokenCookie(response);
+//                Map<String, String> errorResponse = new HashMap<>();
+//                errorResponse.put("message", "Invalid refresh token.");
+//                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+//            }
+//
+//            RefreshToken refreshToken = refreshTokenOptional.get();
+//
+//            // Verify token expiration
+//            refreshTokenService.verifyExpiration(refreshToken);
+//
+//            // Get the user associated with the refresh token
+//            UserEntity userEntity = refreshToken.getUser();
+//            if (userEntity == null || !userEntity.isApproved()) {
+//                refreshTokenService.deleteByToken(providedRefreshToken);
+//                clearRefreshTokenCookie(response);
+//                Map<String, String> errorResponse = new HashMap<>();
+//                errorResponse.put("message", "User account is not approved or invalid.");
+//                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+//            }
+//
+//            // Create authentication for new JWT
+//            Authentication authentication = new UsernamePasswordAuthenticationToken(
+//                    userEntity.getUsername(),
+//                    null,
+//                    userEntity.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList())
+//            );
+//            SecurityContextHolder.getContext().setAuthentication(authentication);
+//
+//            // Generate a new JWT access token
+//            String newAccessToken = jwtGenerator.generateToken(authentication);
+//
+//            // ✅ ATOMIC TOKEN ROTATION - Create new token with automatic old token deletion
+//            RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(providedRefreshToken, userEntity.getId());
+//
+//            // Set the new refresh token in cookie
+//            setRefreshTokenCookie(response, newRefreshToken);
+//
+//            activityLogger.logSystemActivity("Token refreshed for user: " + userEntity.getUsername());
+//
+//            return ResponseEntity.ok(new AuthResponseDto(newAccessToken));
+//
+//        } catch (RuntimeException e) {
+//            clearRefreshTokenCookie(response);
+//            activityLogger.logSystemError("Runtime error during refresh token process: " + e.getMessage());
+//            Map<String, String> errorResponse = new HashMap<>();
+//            errorResponse.put("message", "Invalid refresh token.");
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+//        } catch (Exception e) {
+//            clearRefreshTokenCookie(response);
+//            activityLogger.logSystemError("Unexpected error during token refresh: " + e.getMessage());
+//            Map<String, String> errorResponse = new HashMap<>();
+//            errorResponse.put("message", "An unexpected error occurred during token refresh.");
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+//        }
+//    }
+
+
+
+
+
+
+    // ✅ HELPER METHODS FOR CONSISTENT COOKIE HANDLING
+    private void setRefreshTokenCookie(HttpServletResponse response, RefreshToken refreshToken) {
+        ResponseCookie jwtRefreshCookie = ResponseCookie.from(refreshTokenCookieName, refreshToken.getToken())
+                .httpOnly(true)
+                .secure(false) // Set consistently based on environment
+                .path("/api/auth") // ✅ BROADER PATH for consistency
+                .maxAge(refreshToken.getExpiryDate().getEpochSecond() - Instant.now().getEpochSecond())
+                .sameSite("Strict")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, jwtRefreshCookie.toString());
+    }
+
+    private void clearRefreshTokenCookie(HttpServletResponse response) {
+        ResponseCookie expiredCookie = ResponseCookie.from(refreshTokenCookieName, "")
+                .maxAge(0)
+                .path("/api/auth") // ✅ SAME PATH as set cookie
+                .httpOnly(true)
+                .secure(false) // ✅ CONSISTENT with set cookie
+                .sameSite("Strict")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+    }
+
+
+
+
+
+
+
     @Override
     @Transactional
     public ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response) {
+        // Get the current authenticated user
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : "anonymous";
+
         String providedRefreshToken = null;
         if (request.getCookies() != null) {
             providedRefreshToken = Stream.of(request.getCookies())
@@ -355,22 +568,25 @@ public class AuthServiceImpl implements AuthService {
                     .orElse(null);
         }
 
-        System.out.println("Logout attempting to delete token: >>" + providedRefreshToken + "<<"); // Add this line
-
         if (providedRefreshToken != null) {
             refreshTokenService.deleteByToken(providedRefreshToken);
         }
 
         ResponseCookie refreshCookie = ResponseCookie.from(refreshTokenCookieName, "")
                 .httpOnly(true)
-                .secure(true) // Set to true in production
+                .secure(true)
                 .path("/api/auth/refresh-token")
-                .maxAge(0) // Expire immediately
+                .maxAge(0)
                 .sameSite("Strict")
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
 
-        SecurityContextHolder.clearContext(); // Clear security context
+        SecurityContextHolder.clearContext();
+
+        // Log logout
+        if (!username.equals("anonymous")) {
+            activityLogger.logLogout(username);
+        }
 
         Map<String, String> successResponse = new HashMap<>();
         successResponse.put("message", "Logged out successfully.");
@@ -378,40 +594,128 @@ public class AuthServiceImpl implements AuthService {
     }
 
 
+//
+//    @Override
+//    @Transactional
+//    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request, HttpServletResponse response) {
+//        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+//        String username = auth != null ? auth.getName() : "anonymous";
+//
+//        String providedRefreshToken = null;
+//        if (request.getCookies() != null) {
+//            providedRefreshToken = Stream.of(request.getCookies())
+//                    .filter(cookie -> refreshTokenCookieName.equals(cookie.getName()))
+//                    .map(Cookie::getValue)
+//                    .findFirst()
+//                    .orElse(null);
+//        }
+//
+//        if (providedRefreshToken != null) {
+//            refreshTokenService.deleteByToken(providedRefreshToken);
+//        }
+//
+//        // ✅ USE CONSISTENT COOKIE CLEARING
+//        clearRefreshTokenCookie(response);
+//
+//        SecurityContextHolder.clearContext();
+//
+//        if (!username.equals("anonymous")) {
+//            activityLogger.logLogout(username);
+//        }
+//
+//        Map<String, String> successResponse = new HashMap<>();
+//        successResponse.put("message", "Logged out successfully.");
+//        return new ResponseEntity<>(successResponse, HttpStatus.OK);
+//    }
+
+
+
+
+
+
+
+
     @Override
     @Transactional
     public ResponseEntity<Map<String, String>> approveUser(Long userId) {
+        // Get the current authenticated user (the admin performing the approval)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String adminUsername = auth != null ? auth.getName() : "SYSTEM";
+
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId)); // Use EntityNotFoundException for 404
+                .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
 
         user.setApproved(true);
         userRepository.save(user);
+
+        // Log user approval
+        activityLogger.logUserApproval(adminUsername, user.getUsername(), user.getId());
 
         Map<String, String> successResponse = new HashMap<>();
         successResponse.put("message", "User " + user.getUsername() + " approved successfully.");
         return new ResponseEntity<>(successResponse, HttpStatus.OK);
     }
 
-
     @Override
     @Transactional
     public ResponseEntity<Map<String, String>> suspendUser(Long userId) {
-        try {
-            UserEntity user = userRepository.findById(userId)
-                    .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("User not found with ID: " + userId));
+        // Get the current authenticated user (the admin performing the suspension)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String adminUsername = auth != null ? auth.getName() : "SYSTEM";
 
-            // Set user's approval status to false
-            user.setApproved(false);
-            userRepository.save(user);
+        try {
+            UserEntity userToSuspend = userRepository.findById(userId)
+                    .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + userId));
+
+            // Get the admin user entity
+            UserEntity adminUser = userRepository.findByUsername(adminUsername)
+                    .orElseThrow(() -> new EntityNotFoundException("Admin user not found: " + adminUsername));
+
+            // Check if trying to suspend self
+            if (adminUser.getId().equals(userId)) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("message", "You cannot suspend your own account.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+            }
+
+            // Check permissions based on roles
+            boolean isAdminRole = adminUser.getRoles().stream()
+                    .anyMatch(role -> role.getName().equals("ROLE_ADMIN") && !role.getName().equals("ROLE_SUPER_ADMIN"));
+
+            boolean isSuperAdmin = adminUser.getRoles().stream()
+                    .anyMatch(role -> role.getName().equals("ROLE_SUPER_ADMIN"));
+
+            // Check if target user is an admin
+            boolean targetIsAdmin = userToSuspend.getRoles().stream()
+                    .anyMatch(role -> role.getName().equals("ROLE_ADMIN") || role.getName().equals("ROLE_SUPER_ADMIN"));
+
+            // Regular admin trying to suspend another admin
+            if (isAdminRole && targetIsAdmin) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Regular admins cannot suspend other administrators.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+            }
+
+            // Suspend the user
+            userToSuspend.setApproved(false);
+            userRepository.save(userToSuspend);
+
+            // Log user suspension
+            activityLogger.logUserSuspension(adminUsername, userToSuspend.getUsername(), userToSuspend.getId());
 
             Map<String, String> response = new HashMap<>();
             response.put("message", "User has been suspended successfully");
             return ResponseEntity.ok(response);
-        } catch (jakarta.persistence.EntityNotFoundException e) {
+
+        } catch (EntityNotFoundException e) {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+
         } catch (Exception e) {
+            // Log error
+            activityLogger.logSystemError("Error suspending user ID " + userId + ": " + e.getMessage());
+
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "An error occurred while suspending the user: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
@@ -421,6 +725,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public ResponseEntity<Map<String, String>> promoteToAdmin(Long userId) {
+        // Get the current authenticated user (the super admin performing the promotion)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String adminUsername = auth != null ? auth.getName() : "SYSTEM";
+
+        // Get the currently authenticated user's details
+        UserEntity currentUser = userRepository.findByUsername(adminUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Current authenticated user not found"));
+
+        // Check if super admin is trying to promote themselves
+        if (currentUser.getId().equals(userId)) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "You cannot promote yourself to Admin as you already have Super Admin privileges.");
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        }
+
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
 
@@ -430,13 +749,14 @@ public class AuthServiceImpl implements AuthService {
         // Avoid duplicate roles
         if (user.getRoles().stream().noneMatch(role -> role.getName().equals("ROLE_ADMIN"))) {
             user.getRoles().add(adminRole);
-            // If user was only ROLE_USER and now becomes ROLE_ADMIN, you might want to remove ROLE_USER
-            // or keep both depending on your privilege system. For simplicity, we add.
-            // If they were pending and only had ROLE_USER, ensure they are approved too.
             if (!user.isApproved()) {
                 user.setApproved(true);
             }
             userRepository.save(user);
+
+            // Log role promotion
+            activityLogger.logRolePromotion(adminUsername, user.getUsername(), user.getId(), "ADMIN");
+
             Map<String, String> successResponse = new HashMap<>();
             successResponse.put("message", "User " + user.getUsername() + " promoted to Admin successfully.");
             return new ResponseEntity<>(successResponse, HttpStatus.OK);
@@ -447,11 +767,13 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-
-
     @Override
     @Transactional
     public ResponseEntity<Map<String, String>> demoteFromAdmin(Long userId) {
+        // Get the current authenticated user (the super admin performing the demotion)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String adminUsername = auth != null ? auth.getName() : "SYSTEM";
+
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + userId));
 
@@ -473,6 +795,9 @@ public class AuthServiceImpl implements AuthService {
 
             userRepository.save(user);
 
+            // Log role demotion
+            activityLogger.logRoleDemotion(adminUsername, user.getUsername(), user.getId());
+
             Map<String, String> successResponse = new HashMap<>();
             successResponse.put("message", "User " + user.getUsername() + " has been demoted from Admin role.");
             return new ResponseEntity<>(successResponse, HttpStatus.OK);
@@ -483,12 +808,11 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-
     @Override
     public UserProfileDto getUserProfile(String username) {
         // Find the user by username
         UserEntity user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username)); // Throw standard exception if not found
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
         // Map UserEntity to UserProfileDto
         UserProfileDto dto = new UserProfileDto();
@@ -499,20 +823,19 @@ public class AuthServiceImpl implements AuthService {
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
         dto.setDepartment(user.getDepartment());
-        dto.setStatus(user.isApproved() ? "Approved" : "Pending"); // Map approved boolean to string status
+        dto.setStatus(user.isApproved() ? "Approved" : "Pending");
         dto.setRoles(user.getRoles().stream()
                 .map(role -> role.getName())
-                .collect(Collectors.toList())); // Map roles to list of strings
+                .collect(Collectors.toList()));
 
-        // Additional Profile Fields (Added to UserEntity)
+        // Additional Profile Fields
         dto.setPhone(user.getPhone());
         dto.setAddress(user.getAddress());
         dto.setBio(user.getBio());
-        // Map LocalDate/LocalDateTime to String
-        dto.setBirthdate(user.getBirthdate() != null ? user.getBirthdate().toString() : null); // Simple toString()
+        dto.setBirthdate(user.getBirthdate() != null ? user.getBirthdate().toString() : null);
         dto.setOccupation(user.getOccupation());
         dto.setEducation(user.getEducation());
-        dto.setProfilePictureUrl(user.getProfilePictureUrl()); // Use the field name from UserEntity
+        dto.setProfilePictureUrl(user.getProfilePictureUrl());
 
         // Nested Notification Settings
         NotificationSettingsDto notifications = new NotificationSettingsDto();
@@ -524,38 +847,26 @@ public class AuthServiceImpl implements AuthService {
         // Nested Security Settings
         SecuritySettingsDto security = new SecuritySettingsDto();
         security.setTwoFactor(user.isSecurityTwoFactorEnabled());
-        security.setSessionTimeout(user.getSecuritySessionTimeout()); // Handles null if column is nullable
+        security.setSessionTimeout(user.getSecuritySessionTimeout());
         dto.setSecurity(security);
 
         // Last Login Field
-        // Map LocalDateTime to String
-        dto.setLastLogin(user.getLastLogin() != null ? user.getLastLogin().toString() : null); // Simple toString()
+        dto.setLastLogin(user.getLastLogin() != null ? user.getLastLogin().toString() : null);
 
+        // Log profile view (optional)
+        activityLogger.logSystemActivity("Profile viewed for user: " + username);
 
         return dto;
     }
 
-
-
-
-
-
-
-
-
-
-
-
     @Override
-    @Transactional // Add Transactional annotation as this modifies the database
+    @Transactional
     public MyProfileDto updateMyProfile(String username, UpdateMyProfileDto updateDetails) {
-        // 1. Find the user by username (authenticated user)
+        // Find the user by username (authenticated user)
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Authenticated user not found: " + username));
-        // This exception is unlikely if called after successful authentication, but good practice.
 
-        // 2. Update fields from the DTO where the DTO field is not null
-
+        // Update fields from the DTO where the DTO field is not null
         // Basic Fields
         if (updateDetails.getName() != null) {
             user.setName(updateDetails.getName());
@@ -582,7 +893,7 @@ public class AuthServiceImpl implements AuthService {
                 // Assuming birthdate string is in a parseable format like "YYYY-MM-DD"
                 user.setBirthdate(LocalDate.parse(updateDetails.getBirthdate()));
             } catch (DateTimeParseException e) {
-                throw new IllegalArgumentException("Invalid birthdate format. Use YYYY-MM-DD.", e); // 400 Bad Request
+                throw new IllegalArgumentException("Invalid birthdate format. Use YYYY-MM-DD.", e);
             }
         }
         if (updateDetails.getOccupation() != null) {
@@ -592,7 +903,7 @@ public class AuthServiceImpl implements AuthService {
             user.setEducation(updateDetails.getEducation());
         }
         if (updateDetails.getProfilePicture() != null) {
-            user.setProfilePictureUrl(updateDetails.getProfilePicture()); // Map profilePicture in DTO to profilePictureUrl in Entity
+            user.setProfilePictureUrl(updateDetails.getProfilePicture());
         }
 
         // Nested Notification Settings (Update individual boolean fields)
@@ -607,18 +918,16 @@ public class AuthServiceImpl implements AuthService {
         if (updateDetails.getSecurity() != null) {
             SecuritySettingsDto securityDto = updateDetails.getSecurity();
             user.setSecurityTwoFactorEnabled(securityDto.isTwoFactor());
-            user.setSecuritySessionTimeout(securityDto.getSessionTimeout()); // Handles null automatically
+            user.setSecuritySessionTimeout(securityDto.getSessionTimeout());
         }
 
-        // --- Note: Ignoring fields not intended for user self-update ---
-        // Fields like 'role' and 'status' (approved) from the spec are ignored here.
-
-
-        // 3. Save the updated user
         try {
             UserEntity updatedUser = userRepository.save(user);
 
-            // 4. Map the updated user back to MyProfileDto for the response
+            // Log profile update
+            activityLogger.logProfileUpdate(username);
+
+            // Map the updated user back to MyProfileDto for the response
             MyProfileDto dto = new MyProfileDto();
             dto.setId(updatedUser.getId());
             dto.setName(updatedUser.getName());
@@ -634,7 +943,7 @@ public class AuthServiceImpl implements AuthService {
             dto.setPhone(updatedUser.getPhone());
             dto.setAddress(updatedUser.getAddress());
             dto.setBio(updatedUser.getBio());
-            dto.setBirthdate(updatedUser.getBirthdate() != null ? updatedUser.getBirthdate().toString() : null); // Map LocalDate to String
+            dto.setBirthdate(updatedUser.getBirthdate() != null ? updatedUser.getBirthdate().toString() : null);
             dto.setOccupation(updatedUser.getOccupation());
             dto.setEducation(updatedUser.getEducation());
             dto.setProfilePictureUrl(updatedUser.getProfilePictureUrl());
@@ -653,65 +962,57 @@ public class AuthServiceImpl implements AuthService {
             dto.setSecurity(security);
 
             // Last Login Field (Map from entity)
-            dto.setLastLogin(updatedUser.getLastLogin() != null ? updatedUser.getLastLogin().toString() : null); // Map LocalDateTime to String
+            dto.setLastLogin(updatedUser.getLastLogin() != null ? updatedUser.getLastLogin().toString() : null);
 
             return dto;
 
         } catch (DataIntegrityViolationException e) {
+            // Log error
+            activityLogger.logSystemError("Data integrity violation during profile update for user " + username);
+
             // Catch unique constraint violations (e.g., duplicate email)
-            throw new IllegalArgumentException("Data integrity violation: Email already in use or invalid data.", e); // Throw IllegalArgumentException for 400
+            throw new IllegalArgumentException("Data integrity violation: Email already in use or invalid data.", e);
         }
-        // Catch other potential exceptions here if needed
     }
 
-
-
-
-
     @Override
-    @Transactional // Add Transactional as this modifies the database
+    @Transactional
     public void changePassword(String username, ChangePasswordDto changePasswordDto) {
-        // 1. Find the user by username (authenticated user)
+        // Find the user by username (authenticated user)
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Authenticated user not found: " + username));
-        // Unlikely if called after successful authentication
 
-        // 2. Verify the current password
-        // passwordEncoder.matches(rawPassword, encodedPassword)
+        // Verify the current password
         if (!passwordEncoder.matches(changePasswordDto.getCurrentPassword(), user.getPassword())) {
-            // If current password doesn't match, throw an exception
-            throw new BadCredentialsException("Incorrect current password"); // Throw Spring Security's BadCredentialsException
+            // Log failed password change
+            activityLogger.logSystemActivity("Failed password change attempt: incorrect current password for user " + username);
+
+            throw new BadCredentialsException("Incorrect current password");
         }
 
-        // 3. The DTO validation (@PasswordMatches) ensures newPassword and confirmPassword match
-
-        // 4. Encode the new password
+        // Encode the new password
         String encodedNewPassword = passwordEncoder.encode(changePasswordDto.getNewPassword());
 
-        // 5. Set the new encoded password on the user entity
+        // Set the new encoded password on the user entity
         user.setPassword(encodedNewPassword);
 
-        // 6. Save the updated user
-        userRepository.save(user); // JPA will update the existing user
+        // Save the updated user
+        userRepository.save(user);
 
-        System.out.println("Password successfully changed for user: " + username); // Logging
+        // Log password change
+        activityLogger.logPasswordChange(username);
     }
 
-
-
-
-
-
     @Override
-    @Transactional // Important for DB operations
+    @Transactional
     public void createSuperAdminIfNotExists() {
         final String superAdminUsername = "superadmin";
         if (!userRepository.existsByUsername(superAdminUsername)) {
             UserEntity superAdmin = new UserEntity();
             superAdmin.setUsername(superAdminUsername);
             superAdmin.setName("Super Administrator");
-            superAdmin.setEmail("superadmin@example.com"); // Change as needed
-            superAdmin.setPassword(passwordEncoder.encode("superadmin123")); // Change in production
+            superAdmin.setEmail("superadmin@example.com");
+            superAdmin.setPassword(passwordEncoder.encode("superadmin123"));
             superAdmin.setApproved(true);
             superAdmin.setDepartment("SYSTEM");
 
@@ -735,10 +1036,11 @@ public class AuthServiceImpl implements AuthService {
                         return roleRepository.save(newRole);
                     });
 
-
             superAdmin.setRoles(Collections.singletonList(superAdminRole));
             userRepository.save(superAdmin);
-            System.out.println("Super Admin account created with username: " + superAdminUsername);
+
+            // Log super admin creation
+            activityLogger.logSystemActivity("Super Admin account created with username: " + superAdminUsername);
         }
     }
 }

@@ -52,6 +52,59 @@ public class RefreshTokenService {
         return refreshTokenRepository.save(refreshToken); // Save the new token
     }
 
+
+//
+//    @Transactional
+//    public RefreshToken rotateRefreshToken(String oldToken, Long userId) {
+//        // 1. Find and verify the old token
+//        RefreshToken oldRefreshToken = findByToken(oldToken)
+//                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+//
+//        // 2. Verify it's not expired
+//        verifyExpiration(oldRefreshToken);
+//
+//        // 3. Get the user
+//        UserEntity user = oldRefreshToken.getUser();
+//        if (user == null || !user.getId().equals(userId)) {
+//            throw new RuntimeException("Token user mismatch");
+//        }
+//
+//        // 4. Delete the old token atomically
+//        refreshTokenRepository.delete(oldRefreshToken);
+//        entityManager.flush(); // Force the delete to complete
+//
+//        // 5. Create the new token
+//        RefreshToken newRefreshToken = RefreshToken.builder()
+//                .user(user)
+//                .token(UUID.randomUUID().toString())
+//                .expiryDate(Instant.now().plusMillis(SecurityConstant.JWT_REFRESH_EXPIRATION))
+//                .build();
+//
+//        return refreshTokenRepository.save(newRefreshToken);
+//    }
+//
+//    // ✅ MODIFY createRefreshToken to NOT delete existing tokens
+//    @Transactional
+//    public RefreshToken createRefreshToken(Long userId) {
+//        UserEntity user = userRepository.findById(userId)
+//                .orElseThrow(() -> new RuntimeException("User not found for refresh token creation: " + userId));
+//
+//        // ✅ REMOVE automatic deletion - let calling code handle it explicitly
+//        // refreshTokenRepository.deleteByUser(user); // REMOVE THIS LINE
+//
+//        RefreshToken refreshToken = RefreshToken.builder()
+//                .user(user)
+//                .token(UUID.randomUUID().toString())
+//                .expiryDate(Instant.now().plusMillis(SecurityConstant.JWT_REFRESH_EXPIRATION))
+//                .build();
+//
+//        return refreshTokenRepository.save(refreshToken);
+//    }
+
+
+
+
+
     public RefreshToken verifyExpiration(RefreshToken token) {
         if (token.getExpiryDate().compareTo(Instant.now()) < 0) {
             refreshTokenRepository.delete(token);

@@ -192,7 +192,7 @@ INSERT INTO `categories` (`id`, `name`) VALUES
 --
 
 INSERT INTO `users` (`id`, `address`, `approved`, `bio`, `birthdate`, `department`, `education`, `email`, `lastLogin`, `name`, `notificationAppEnabled`, `notificationEmailEnabled`, `notificationUpdatesEnabled`, `occupation`, `password`, `phone`, `profilePictureUrl`, `securitySessionTimeout`, `securityTwoFactorEnabled`, `username`) VALUES
-(2, NULL, b'1', NULL, NULL, 'ADMIN', NULL, 'admin@stemapp.com', '2025-05-23 20:00:00.000000', 'Administrator', b'1', b'1', b'1', NULL, '$2a$10$XptfskLsT1l/bRTLRiiCgejHqOpgXFreUnNUa35gJdCr2v2QbVFzu', NULL, NULL, '30', b'1', 'admin'),
+(2, NULL, b'1', NULL, NULL, 'computer science', NULL, 'haroon@stemapp.com', '2025-05-23 20:00:00.000000', 'haroon', b'1', b'1', b'1', NULL, '$2a$10$82bBz2cYa7FvJmei1PJzgu/2kN7AbfcF72P4QXxBs5a4kfUn29PQe', NULL, NULL, '30', b'1', 'haroon'),
 (3, '123 Academic Rd, Dar es Salaam', b'1', 'Expert in STEM education', '1975-03-10', 'Education', 'PhD Education', 'rose.matete@stemapp.com', '2025-05-23 18:00:00.000000', 'Dr. Rose E. Matete', b'1', b'1', b'0', 'Professor', '$2a$10$abc123xyz789', '+255700123456', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2', '15', b'0', 'rmatete'),
 (4, '456 Science St, Arusha', b'1', 'Researcher in laboratory design', '1980-06-15', 'Science', 'PhD Chemistry', 'ombeni.msuya@stemapp.com', '2025-05-23 17:30:00.000000', 'Dr. Ombeni W. Msuya', b'0', b'1', b'1', 'Researcher', '$2a$10$xyz789abc123', '+255711987654', 'https://images.unsplash.com/photo-1560250097-0b93528c311a', '15', b'0', 'omsuya'),
 (5, '789 Tech Ave, Dodoma', b'1', 'Teacher training specialist', '1978-09-20', 'Education', 'PhD Education', 'abdallah.seni@stemapp.com', '2025-05-23 16:00:00.000000', 'Dr. Abdallah J. Seni', b'1', b'0', b'1', 'Educator', '$2a$10$def456ghi789', '+255722345678', 'https://images.unsplash.com/photo-1542190891-2093d38760f2', '20', b'1', 'aseni'),
@@ -209,7 +209,6 @@ INSERT INTO `users` (`id`, `address`, `approved`, `bio`, `birthdate`, `departmen
 --
 
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
-(2, (SELECT Id FROM roles WHERE name = 'ROLE_ADMIN')),
 (2, (SELECT Id FROM roles WHERE name = 'ROLE_USER')),
 (3, (SELECT Id FROM roles WHERE name = 'ROLE_USER')),
 (4, (SELECT Id FROM roles WHERE name = 'ROLE_USER')),

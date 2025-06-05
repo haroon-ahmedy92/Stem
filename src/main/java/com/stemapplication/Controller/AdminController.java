@@ -74,7 +74,7 @@ public class AdminController {
 
 
     @GetMapping("/users")
-    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<List<com.stemapplication.DTO.UserProfileDto>> getAllUsers() {
         return ResponseEntity.ok(adminService.getAllUsers());
     }

@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/promote-to-admin/**").hasAuthority("ROLE_SUPER_ADMIN")
                         .requestMatchers("/api/admin/demote-from-admin/**").hasAuthority("ROLE_SUPER_ADMIN")
                         // General user/admin management by Super Admin
-                        .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAuthority("ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAnyAuthority("ROLE_ADMIN","ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/admins").hasAuthority("ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/users/{userId}").hasAuthority("ROLE_SUPER_ADMIN")
@@ -84,7 +84,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/admin/comments/approve/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/comments/delete/{commentId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/comments/post/{blogPostId}").hasAnyAuthority("ROLE_USER","ROLE_ADMIN", "ROLE_SUPER_ADMIN")
-                        
+
                         // --- Gallery Public Endpoints ---
                         .requestMatchers(HttpMethod.GET, "/api/gallery").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/gallery/{id}").permitAll()

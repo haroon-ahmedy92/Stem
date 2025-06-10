@@ -40,25 +40,6 @@ show_logs() {
 check_health() {
     echo "🏥 Checking service health..."
     
-    # Wait for services to be ready with improved retry logic
-    echo "⏳ Waiting for MySQL to be ready..."
-    local mysql_ready=false
-    for i in {1..30}; do
-        if docker-compose exec -T mysql mysqladmin ping -h"localhost" --silent 2>/dev/null; then
-            mysql_ready=true
-            break
-        fi
-        echo "   Attempt $i/30: MySQL not ready yet, waiting 5 seconds..."
-        sleep 5
-    done
-    
-    if [ "$mysql_ready" = false ]; then
-        echo "❌ MySQL failed to start after 2.5 minutes"
-        docker-compose logs mysql
-        exit 1
-    fi
-    echo "✅ MySQL is ready"
-    
     echo "⏳ Waiting for Redis to be ready..."
     local redis_ready=false
     for i in {1..12}; do
@@ -79,17 +60,17 @@ check_health() {
     
     echo "⏳ Waiting for Spring Boot app to be ready..."
     local app_ready=false
-    for i in {1..24}; do
+    for i in {1..18}; do
         if curl -f http://localhost:8000/actuator/health >/dev/null 2>&1; then
             app_ready=true
             break
         fi
-        echo "   Attempt $i/24: Spring Boot app not ready yet, waiting 10 seconds..."
+        echo "   Attempt $i/18: Spring Boot app not ready yet, waiting 10 seconds..."
         sleep 10
     done
     
     if [ "$app_ready" = false ]; then
-        echo "❌ Spring Boot app failed to start after 4 minutes"
+        echo "❌ Spring Boot app failed to start after 3 minutes"
         echo "📋 App logs:"
         docker-compose logs app
         exit 1
@@ -99,8 +80,8 @@ check_health() {
     echo "🎉 All services are healthy!"
     echo "🌐 Application available at: http://localhost"
     echo "🔧 Direct app access: http://localhost:8000"
-    echo "💾 MySQL available at: localhost:3306"
     echo "🚀 Redis available at: localhost:6379"
+    echo "💾 Using external MySQL database: 82.197.82.136:3306"
 }
 
 # Main script logic

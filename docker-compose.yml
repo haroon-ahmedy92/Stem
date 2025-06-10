@@ -1,28 +1,6 @@
 version: '3.8'
 
 services:
-  # MySQL Database
-  mysql:
-    image: mysql:8.0
-    container_name: stem-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: Stemdb2
-      MYSQL_USER: venlit
-      MYSQL_PASSWORD: venlit
-      MYSQL_ROOT_PASSWORD: rootpassword
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    networks:
-      - stem-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
-
   # Redis for caching (optional but recommended for production)
   redis:
     image: redis:7-alpine
@@ -51,14 +29,12 @@ services:
       - "8000:8000"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/Stemdb2
-      SPRING_DATASOURCE_USERNAME: venlit
-      SPRING_DATASOURCE_PASSWORD: venlit
+      SPRING_DATASOURCE_URL: jdbc:mysql://82.197.82.136:3306/u934701285_stem
+      SPRING_DATASOURCE_USERNAME: u934701285_stem_user
+      SPRING_DATASOURCE_PASSWORD: T9LvG/4&zc2.2Xc
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
@@ -70,12 +46,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s
-    # Add startup delay to ensure database is fully ready
+      start_period: 60s
+    # Reduced startup delay since we're using external database
     command: >
       sh -c "
-        echo 'Waiting for database to be fully ready...' &&
-        sleep 30 &&
+        echo 'Starting application with external database...' &&
+        sleep 10 &&
         java -jar app.jar
       "
 
@@ -100,8 +76,6 @@ networks:
     driver: bridge
 
 volumes:
-  mysql_data:
-    driver: local
   redis_data:
     driver: local
   app_logs:

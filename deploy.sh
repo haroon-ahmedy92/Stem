@@ -40,23 +40,60 @@ show_logs() {
 check_health() {
     echo "🏥 Checking service health..."
     
-    # Wait for services to be ready
+    # Wait for services to be ready with improved retry logic
     echo "⏳ Waiting for MySQL to be ready..."
-    until docker-compose exec mysql mysqladmin ping -h"localhost" --silent; do
-        sleep 2
+    local mysql_ready=false
+    for i in {1..30}; do
+        if docker-compose exec -T mysql mysqladmin ping -h"localhost" --silent 2>/dev/null; then
+            mysql_ready=true
+            break
+        fi
+        echo "   Attempt $i/30: MySQL not ready yet, waiting 5 seconds..."
+        sleep 5
     done
+    
+    if [ "$mysql_ready" = false ]; then
+        echo "❌ MySQL failed to start after 2.5 minutes"
+        docker-compose logs mysql
+        exit 1
+    fi
     echo "✅ MySQL is ready"
     
     echo "⏳ Waiting for Redis to be ready..."
-    until docker-compose exec redis redis-cli ping | grep -q PONG; do
-        sleep 2
+    local redis_ready=false
+    for i in {1..12}; do
+        if docker-compose exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
+            redis_ready=true
+            break
+        fi
+        echo "   Attempt $i/12: Redis not ready yet, waiting 5 seconds..."
+        sleep 5
     done
+    
+    if [ "$redis_ready" = false ]; then
+        echo "❌ Redis failed to start after 1 minute"
+        docker-compose logs redis
+        exit 1
+    fi
     echo "✅ Redis is ready"
     
     echo "⏳ Waiting for Spring Boot app to be ready..."
-    until curl -f http://localhost:8000/actuator/health >/dev/null 2>&1; do
-        sleep 5
+    local app_ready=false
+    for i in {1..24}; do
+        if curl -f http://localhost:8000/actuator/health >/dev/null 2>&1; then
+            app_ready=true
+            break
+        fi
+        echo "   Attempt $i/24: Spring Boot app not ready yet, waiting 10 seconds..."
+        sleep 10
     done
+    
+    if [ "$app_ready" = false ]; then
+        echo "❌ Spring Boot app failed to start after 4 minutes"
+        echo "📋 App logs:"
+        docker-compose logs app
+        exit 1
+    fi
     echo "✅ Spring Boot app is ready"
     
     echo "🎉 All services are healthy!"

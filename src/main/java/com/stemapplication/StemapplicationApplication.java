@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 
 @SpringBootApplication
-@EnableJpaRepositories("com.stemapplication.Repository") // Explicitly scan your repository package
+@EnableJpaRepositories("com.stemapplication.Repository")
 @EnableScheduling
 public class StemapplicationApplication {
 

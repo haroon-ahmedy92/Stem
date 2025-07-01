@@ -4,7 +4,7 @@ import lombok.Data;
 
 import java.util.List;
 
-// Updated DTO for the GET /api/users/me response body
+
 @Data
 public class UserProfileDto {
     private Long id;

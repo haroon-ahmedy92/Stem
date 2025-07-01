@@ -1,6 +1,5 @@
 package com.stemapplication.Utils;
 
-import com.stemapplication.Models.ActivityLog;
 import com.stemapplication.Service.ActivityLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

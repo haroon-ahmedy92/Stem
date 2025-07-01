@@ -100,6 +100,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/gallery/{id}").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/gallery/{id}").authenticated()
 
+                        // --- Team Members Public Endpoints ---
+                        .requestMatchers(HttpMethod.GET, "/api/team-members").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/team-members/{id}").permitAll()
+
+                        // --- Team Members Admin Endpoints ---
+                        .requestMatchers(HttpMethod.POST, "/api/team-members").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/team-members/{id}").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/team-members/{id}").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+
                         .anyRequest().authenticated()
                 )
 

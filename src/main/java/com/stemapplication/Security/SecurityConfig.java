@@ -109,6 +109,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/team-members/{id}").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/team-members/{id}").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
 
+                        // --- About Content Public Endpoints (no authentication required) ---
+                        .requestMatchers(HttpMethod.GET, "/api/about-content").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/about-content/**").permitAll()
+
+                        // --- About Content Admin Endpoints (admin authentication required) ---
+                        .requestMatchers(HttpMethod.PUT, "/api/about-content/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/about-content/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/about-content/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+
                         .anyRequest().authenticated()
                 )
 

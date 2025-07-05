@@ -52,6 +52,26 @@ public interface AboutContentService {
     SpecificObjectiveDto createSpecificObjective(CreateObjectiveDto createDto);
     
     /**
+     * Create new background section (Admin only)
+     */
+    BackgroundSectionDto createBackgroundSection(CreateBackgroundSectionDto createDto);
+    
+    /**
+     * Update background section (Admin only)
+     */
+    BackgroundSectionDto updateBackgroundSection(Long id, UpdateBackgroundSectionDto updateDto);
+    
+    /**
+     * Delete background section (Admin only)
+     */
+    void deleteBackgroundSection(Long id);
+    
+    /**
+     * Reorder background sections (Admin only)
+     */
+    List<BackgroundSectionDto> reorderBackgroundSections(ReorderBackgroundSectionsDto reorderDto);
+    
+    /**
      * Get analytics data (Admin only)
      */
     Object getAnalytics();

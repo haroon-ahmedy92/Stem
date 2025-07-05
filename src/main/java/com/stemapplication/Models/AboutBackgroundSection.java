@@ -29,6 +29,9 @@ public class AboutBackgroundSection {
     @Column(name = "display_order")
     private Integer displayOrder;
     
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "about_background_id", nullable = false)
     private AboutBackground aboutBackground;

@@ -378,15 +378,6 @@ public class AboutContentServiceImpl implements AboutContentService {
     
     // DTO Conversion methods
     
-    private BackgroundSectionDto convertBackgroundSectionToDto(AboutBackgroundSection section) {
-        BackgroundSectionDto dto = new BackgroundSectionDto();
-        dto.setId(section.getId());
-        dto.setTitle(section.getTitle());
-        dto.setContent(section.getContent());
-        dto.setDisplayOrder(section.getDisplayOrder());
-        return dto;
-    }
-    
     private BenefitDto convertBenefitToDto(StemBenefit benefit) {
         BenefitDto dto = new BenefitDto();
         dto.setId(benefit.getId());
@@ -406,6 +397,103 @@ public class AboutContentServiceImpl implements AboutContentService {
         dto.setAuthor(reference.getAuthor());
         dto.setPublicationDate(reference.getPublicationDate());
         dto.setDisplayOrder(reference.getDisplayOrder());
+        return dto;
+    }
+    
+    @Override
+    public BackgroundSectionDto createBackgroundSection(CreateBackgroundSectionDto createDto) {
+        log.debug("Creating new background section: {}", createDto.getTitle());
+        
+        // Get the default background (assuming there's one)
+        AboutBackground background = backgroundRepository.findAll().stream()
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("No background found. Please create background first."));
+        
+        AboutBackgroundSection section = new AboutBackgroundSection();
+        section.setTitle(createDto.getTitle());
+        section.setContent(createDto.getContent());
+        section.setDisplayOrder(createDto.getDisplayOrder() != null ? 
+                createDto.getDisplayOrder() : 
+                backgroundSectionRepository.getNextDisplayOrder(background.getId()));
+        section.setIsActive(createDto.getIsActive() != null ? createDto.getIsActive() : true);
+        section.setAboutBackground(background);
+        
+        AboutBackgroundSection savedSection = backgroundSectionRepository.save(section);
+        return convertBackgroundSectionToDto(savedSection);
+    }
+    
+    @Override
+    public BackgroundSectionDto updateBackgroundSection(Long id, UpdateBackgroundSectionDto updateDto) {
+        log.debug("Updating background section with id: {}", id);
+        
+        AboutBackgroundSection section = backgroundSectionRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Background section not found with id: " + id));
+        
+        if (updateDto.getTitle() != null) {
+            section.setTitle(updateDto.getTitle());
+        }
+        if (updateDto.getContent() != null) {
+            section.setContent(updateDto.getContent());
+        }
+        if (updateDto.getDisplayOrder() != null) {
+            section.setDisplayOrder(updateDto.getDisplayOrder());
+        }
+        if (updateDto.getIsActive() != null) {
+            section.setIsActive(updateDto.getIsActive());
+        }
+        
+        AboutBackgroundSection savedSection = backgroundSectionRepository.save(section);
+        return convertBackgroundSectionToDto(savedSection);
+    }
+    
+    @Override
+    public void deleteBackgroundSection(Long id) {
+        log.debug("Deleting background section with id: {}", id);
+        
+        AboutBackgroundSection section = backgroundSectionRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Background section not found with id: " + id));
+        
+        backgroundSectionRepository.delete(section);
+        log.info("Background section deleted successfully with id: {}", id);
+    }
+    
+    @Override
+    @Transactional
+    public List<BackgroundSectionDto> reorderBackgroundSections(ReorderBackgroundSectionsDto reorderDto) {
+        log.debug("Reordering background sections");
+        
+        List<Long> sectionIds = reorderDto.getSectionsOrder();
+        
+        // Validate that all sections exist
+        for (Long sectionId : sectionIds) {
+            if (!backgroundSectionRepository.existsById(sectionId)) {
+                throw new EntityNotFoundException("Background section not found with id: " + sectionId);
+            }
+        }
+        
+        // Update display orders
+        for (int i = 0; i < sectionIds.size(); i++) {
+            Long sectionId = sectionIds.get(i);
+            backgroundSectionRepository.updateDisplayOrder(sectionId, i + 1);
+        }
+        
+        // Return updated sections
+        List<AboutBackgroundSection> sections = backgroundSectionRepository.findAllById(sectionIds);
+        return sections.stream()
+                .sorted((s1, s2) -> s1.getDisplayOrder().compareTo(s2.getDisplayOrder()))
+                .map(this::convertBackgroundSectionToDto)
+                .collect(Collectors.toList());
+    }
+    
+    private BackgroundSectionDto convertBackgroundSectionToDto(AboutBackgroundSection section) {
+        BackgroundSectionDto dto = new BackgroundSectionDto();
+        dto.setId(section.getId());
+        dto.setTitle(section.getTitle());
+        dto.setContent(section.getContent());
+        dto.setDisplayOrder(section.getDisplayOrder());
+        dto.setIsActive(section.getIsActive());
+        dto.setCreatedAt(section.getCreatedAt());
+        dto.setUpdatedAt(section.getUpdatedAt());
         return dto;
     }
     

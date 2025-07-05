@@ -1,10 +1,12 @@
-package com.stemapplication; // Or your main package
+package com.stemapplication;
 
 import com.stemapplication.Models.*;
 import com.stemapplication.Repository.*;
 import com.stemapplication.Service.AuthService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
@@ -17,6 +19,12 @@ public class DataInitializer implements CommandLineRunner {
     private final JustificationReferenceRepository referenceRepository;
     private final AboutObjectivesRepository objectivesRepository;
     private final SpecificObjectiveRepository specificObjectiveRepository;
+    
+    // Homepage repositories
+    private final HomepageHeroRepository homepageHeroRepository;
+    private final HomepageActivityRepository homepageActivityRepository;
+    private final HomepageOutcomeRepository homepageOutcomeRepository;
+    private final HomepageSectionRepository homepageSectionRepository;
 
     public DataInitializer(AuthService authService,
                           AboutBackgroundRepository backgroundRepository,
@@ -25,7 +33,11 @@ public class DataInitializer implements CommandLineRunner {
                           AboutJustificationRepository justificationRepository,
                           JustificationReferenceRepository referenceRepository,
                           AboutObjectivesRepository objectivesRepository,
-                          SpecificObjectiveRepository specificObjectiveRepository) {
+                          SpecificObjectiveRepository specificObjectiveRepository,
+                          HomepageHeroRepository homepageHeroRepository,
+                          HomepageActivityRepository homepageActivityRepository,
+                          HomepageOutcomeRepository homepageOutcomeRepository,
+                          HomepageSectionRepository homepageSectionRepository) {
         this.authService = authService;
         this.backgroundRepository = backgroundRepository;
         this.backgroundSectionRepository = backgroundSectionRepository;
@@ -34,12 +46,17 @@ public class DataInitializer implements CommandLineRunner {
         this.referenceRepository = referenceRepository;
         this.objectivesRepository = objectivesRepository;
         this.specificObjectiveRepository = specificObjectiveRepository;
+        this.homepageHeroRepository = homepageHeroRepository;
+        this.homepageActivityRepository = homepageActivityRepository;
+        this.homepageOutcomeRepository = homepageOutcomeRepository;
+        this.homepageSectionRepository = homepageSectionRepository;
     }
 
     @Override
     public void run(String... args) throws Exception {
         authService.createSuperAdminIfNotExists();
         initializeAboutPageData();
+        initializeHomepageData();
     }
     
     private void initializeAboutPageData() {
@@ -160,5 +177,166 @@ public class DataInitializer implements CommandLineRunner {
             
             specificObjectiveRepository.save(objective);
         }
+    }
+    
+    private void initializeHomepageData() {
+        // Initialize Homepage Hero
+        if (homepageHeroRepository.count() == 0) {
+            initializeHomepageHero();
+        }
+        
+        // Initialize Homepage Activities  
+        if (homepageActivityRepository.count() == 0) {
+            initializeHomepageActivities();
+        }
+        
+        // Initialize Homepage Outcomes
+        if (homepageOutcomeRepository.count() == 0) {
+            initializeHomepageOutcomes();
+        }
+        
+        // Initialize Homepage Sections
+        if (homepageSectionRepository.count() == 0) {
+            initializeHomepageSections();
+        }
+    }
+    
+    private void initializeHomepageHero() {
+        HomepageHero hero = new HomepageHero();
+        hero.setTitle("STEM Education for Tomorrow's Leaders");
+        hero.setSubtitle("Empowering students through innovative Science, Technology, Engineering, and Mathematics education");
+        hero.setBackgroundImage("/images/stem-hero-bg.jpg");
+        hero.setBackgroundGradient("linear-gradient(135deg, #667eea 0%, #764ba2 100%)");
+        hero.setCtaText("Explore Our Mission");
+        hero.setCtaLink("/about");
+        hero.setCtaColor("#1976d2");
+        hero.setSearchEnabled(true);
+        hero.setSearchPlaceholder("Search STEM programs...");
+        hero.setIsPublished(true);
+        
+        homepageHeroRepository.save(hero);
+    }
+    
+    private void initializeHomepageActivities() {
+        String[][] activitiesData = {
+            {"Teacher Training Programs", 
+                "Comprehensive training for science teachers to enhance their teaching methodologies and subject expertise",
+                "fas fa-chalkboard-teacher", "#1976d2"},
+            {"Laboratory Enhancement", 
+                "Upgrading and strengthening laboratory facilities for effective hands-on science learning",
+                "fas fa-flask", "#388e3c"},
+            {"Community Engagement", 
+                "Involving local communities and parents in supporting STEM education initiatives",
+                "fas fa-users", "#f57c00"},
+            {"Student Mentorship", 
+                "One-on-one mentoring programs to guide students in STEM career paths",
+                "fas fa-user-graduate", "#7b1fa2"},
+            {"Educational Resources", 
+                "Developing and distributing quality educational materials for science subjects",
+                "fas fa-book", "#c2185b"},
+            {"Research & Innovation", 
+                "Promoting research culture and innovation among students and teachers",
+                "fas fa-lightbulb", "#00796b"}
+        };
+        
+        for (int i = 0; i < activitiesData.length; i++) {
+            HomepageActivity activity = new HomepageActivity();
+            activity.setTitle(activitiesData[i][0]);
+            activity.setDescription(activitiesData[i][1]);
+            activity.setIconClass(activitiesData[i][2]);
+            activity.setColor(activitiesData[i][3]);
+            activity.setOrderIndex(i + 1);
+            activity.setIsFeatured(i < 3); // First 3 are featured
+            activity.setIsPublished(true);
+            
+            homepageActivityRepository.save(activity);
+        }
+    }
+    
+    private void initializeHomepageOutcomes() {
+        String[][] outcomesData = {
+            {"Teachers Trained", "500+", 
+                "Secondary school science teachers have completed our comprehensive training programs",
+                "fas fa-chalkboard-teacher"},
+            {"Schools Impacted", "120+", 
+                "Secondary schools across Tanzania have benefited from our STEM initiatives",
+                "fas fa-school"},
+            {"Students Reached", "15,000+", 
+                "Students have experienced improved STEM education through our programs",
+                "fas fa-user-graduate"},
+            {"Labs Enhanced", "80+", 
+                "Science laboratories have been upgraded with modern equipment and resources",
+                "fas fa-flask"},
+            {"Communities Engaged", "50+", 
+                "Local communities are actively participating in supporting STEM education",
+                "fas fa-users"},
+            {"Success Rate", "95%", 
+                "Of participating students show improved performance in science subjects",
+                "fas fa-chart-line"}
+        };
+        
+        for (int i = 0; i < outcomesData.length; i++) {
+            HomepageOutcome outcome = new HomepageOutcome();
+            outcome.setTitle(outcomesData[i][0]);
+            outcome.setDescription(outcomesData[i][2]);
+            outcome.setIconClass(outcomesData[i][3]);
+            outcome.setOrderIndex(i + 1);
+            outcome.setIsPublished(true);
+            outcome.setStatus(HomepageOutcome.OutcomeStatus.ON_TRACK);
+            
+            // Add metrics as simple map (will be stored as TEXT)
+            Map<String, Object> metrics = new HashMap<>();
+            metrics.put("value", outcomesData[i][1]);
+            outcome.setMetrics(metrics);
+            
+            homepageOutcomeRepository.save(outcome);
+        }
+    }
+    
+    private void initializeHomepageSections() {
+        // Activities Section
+        HomepageSection activitiesSection = new HomepageSection();
+        activitiesSection.setSectionType(HomepageSection.SectionType.ACTIVITIES);
+        activitiesSection.setTitle("Our Key Activities");
+        activitiesSection.setSubtitle("Transforming STEM Education in Tanzania");
+        activitiesSection.setDescription("We focus on comprehensive programs that address the core challenges in science education, from teacher training to community engagement.");
+        activitiesSection.setBackgroundColor("#f8f9fa");
+        activitiesSection.setContentBackground("#ffffff");
+        activitiesSection.setIsPublished(true);
+        
+        // Outcomes Section
+        HomepageSection outcomesSection = new HomepageSection();
+        outcomesSection.setSectionType(HomepageSection.SectionType.OUTCOMES);
+        outcomesSection.setTitle("Our Impact & Achievements");
+        outcomesSection.setSubtitle("Measurable Results in STEM Education");
+        outcomesSection.setDescription("See the tangible impact we've made in improving science education across Tanzania through our various programs and initiatives.");
+        outcomesSection.setBackgroundColor("#e3f2fd");
+        outcomesSection.setContentBackground("#ffffff");
+        outcomesSection.setIsPublished(true);
+        
+        // Monitoring Section
+        HomepageSection monitoringSection = new HomepageSection();
+        monitoringSection.setSectionType(HomepageSection.SectionType.MONITORING);
+        monitoringSection.setTitle("Monitoring & Evaluation");
+        monitoringSection.setSubtitle("Ensuring Quality and Effectiveness");
+        monitoringSection.setDescription("We continuously monitor and evaluate our programs to ensure they meet the highest standards and deliver meaningful impact to students and teachers.");
+        monitoringSection.setBackgroundColor("#f3e5f5");
+        monitoringSection.setContentBackground("#ffffff");
+        monitoringSection.setIsPublished(true);
+        
+        // Ethics Section
+        HomepageSection ethicsSection = new HomepageSection();
+        ethicsSection.setSectionType(HomepageSection.SectionType.ETHICS);
+        ethicsSection.setTitle("Ethics & Integrity");
+        ethicsSection.setSubtitle("Committed to Ethical Excellence");
+        ethicsSection.setDescription("Our commitment to ethical practices ensures that all our STEM education initiatives are conducted with the highest levels of integrity and transparency.");
+        ethicsSection.setBackgroundColor("#e8f5e8");
+        ethicsSection.setContentBackground("#ffffff");
+        ethicsSection.setIsPublished(true);
+        
+        homepageSectionRepository.save(activitiesSection);
+        homepageSectionRepository.save(outcomesSection);
+        homepageSectionRepository.save(monitoringSection);
+        homepageSectionRepository.save(ethicsSection);
     }
 }

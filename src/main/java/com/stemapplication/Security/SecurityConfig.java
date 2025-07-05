@@ -37,6 +37,13 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(authEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // --- Actuator Endpoints ---
+                        .requestMatchers("/actuator/**").permitAll()
+                        
+                        // --- Homepage Content Public Endpoints (ORDER MATTERS - placed first) ---
+                        .requestMatchers(HttpMethod.GET, "/api/homepage-content").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/homepage-content/**").permitAll()
+                        
                         // --- Public Auth Endpoints ---
                         .requestMatchers("/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
@@ -117,6 +124,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/about-content/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/about-content/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/about-content/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+
+                        // --- Homepage Content Admin Endpoints (admin authentication required) ---
+                        .requestMatchers(HttpMethod.PUT, "/api/homepage-content/hero").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/homepage-content/activities").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/homepage-content/activities/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/homepage-content/activities/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/homepage-content/outcomes").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/homepage-content/outcomes/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/homepage-content/outcomes/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/homepage-content/sections/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/homepage-content/analytics").hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPER_ADMIN")
 
                         .anyRequest().authenticated()
                 )

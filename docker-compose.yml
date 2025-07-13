@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  mysqldb:
+    image: mysql:8.0
+    container_name: mysql_container
+    environment:
+      # These environment variables configure the database.
+      # They must match the credentials in your application.properties
+      MYSQL_ROOT_PASSWORD: amaniamani
+      MYSQL_DATABASE: Stemdb2
+      MYSQL_USER: haroon
+      MYSQL_PASSWORD: amaniamani
+    ports:
+      # Map the container's 3306 port to the host machine's 3307 port to avoid conflict
+      - "3307:3306"
+    volumes:
+      # Persist the database data even if the container is stopped or removed
+      - mysql_data:/var/lib/mysql
+
+  # Spring Boot Application Service
+  springboot-app:
+    build:
+      # Look for the Dockerfile in the current directory
+      context: .
+      dockerfile: Dockerfile
+    container_name: springboot_app_container
+    ports:
+      # Map the container's 8080 port to the host machine's 8080 port
+      - "8000:8000"
+    depends_on:
+      # Ensure the MySQL container starts before the Spring Boot application
+      - mysqldb
+    environment:
+      # Optional: You can also pass environment variables from here instead of directly in application.properties
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysqldb:3306/Stemdb2?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: haroon
+      SPRING_DATASOURCE_PASSWORD: amaniamani
+
+volumes:
+  mysql_data:
